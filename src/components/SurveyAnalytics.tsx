@@ -2,13 +2,15 @@ import React from 'react';
 import { ArrowLeft, Download, Users, BarChart3, Calendar } from 'lucide-react';
 import { Survey, Response } from '../types/survey';
 import { databaseUtils } from '../utils/database';
+import { User } from '../types/auth';
 
 interface SurveyAnalyticsProps {
   survey: Survey;
   onBack: () => void;
+  user: User | null;
 }
 
-export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack }) => {
+export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack, user }) => {
   const [responses, setResponses] = React.useState<Response[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -16,7 +18,7 @@ export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack
     const loadResponses = async () => {
       setIsLoading(true);
       try {
-        const responseData = await databaseUtils.getResponsesForSurvey(survey.id);
+        const responseData = await databaseUtils.getResponsesForSurvey(survey.id, user || undefined);
         setResponses(responseData);
       } catch (error) {
         console.error('Failed to load responses:', error);
@@ -26,7 +28,7 @@ export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack
     };
 
     loadResponses();
-  }, [survey.id]);
+  }, [survey.id, user]);
 
   const getQuestionAnalytics = (questionId: string) => {
     const question = survey.questions.find(q => q.id === questionId);

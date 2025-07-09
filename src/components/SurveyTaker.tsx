@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { ArrowLeft, Send, CheckCircle } from 'lucide-react';
 import { Survey, Question, Response, Answer } from '../types/survey';
 import { databaseUtils } from '../utils/database';
+import { User } from '../types/auth';
 
 interface SurveyTakerProps {
   survey: Survey;
   onBack: () => void;
+  user: User | null;
 }
 
-export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack }) => {
+export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack, user }) => {
   const [answers, setAnswers] = useState<{ [questionId: string]: string | number }>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [questionId: string]: string }>({});

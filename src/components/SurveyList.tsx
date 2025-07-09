@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus, Edit, Trash2, Eye, BarChart3, Calendar, Users, ToggleLeft, ToggleRight, Settings, Share2, Copy, ExternalLink } from 'lucide-react';
 import { Survey } from '../types/survey';
 import { databaseUtils } from '../utils/database';
+import { User } from '../types/auth';
 
 interface SurveyListProps {
   surveys: Survey[];
@@ -11,6 +12,7 @@ interface SurveyListProps {
   onViewAnalytics: (survey: Survey) => void;
   onViewAdmin: () => void;
   onRefresh: () => void;
+  user: User | null;
 }
 
 export const SurveyList: React.FC<SurveyListProps> = ({
@@ -21,6 +23,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   onViewAnalytics,
   onViewAdmin,
   onRefresh,
+  user,
 }) => {
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -28,7 +31,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
     if (window.confirm('Are you sure you want to delete this survey? This action cannot be undone.')) {
       setIsLoading(true);
       try {
-        await databaseUtils.deleteSurvey(surveyId);
+        await databaseUtils.deleteSurvey(surveyId, user || undefined);
         onRefresh();
       } catch (error) {
         alert('Failed to delete survey. Please try again.');
@@ -42,7 +45,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
     setIsLoading(true);
     try {
     const updatedSurvey = { ...survey, isActive: !survey.isActive };
-      await databaseUtils.saveSurvey(updatedSurvey);
+      await databaseUtils.saveSurvey(updatedSurvey, user || undefined);
       onRefresh();
     } catch (error) {
       alert('Failed to update survey status. Please try again.');
@@ -68,7 +71,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
 
   const getResponseCount = async (surveyId: string) => {
     try {
-      const responses = await databaseUtils.getResponsesForSurvey(surveyId);
+      const responses = await databaseUtils.getResponsesForSurvey(surveyId, user || undefined);
       return responses.length;
     } catch (error) {
       return 0;
@@ -160,7 +163,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Users size={14} />
-                    <ResponseCount surveyId={survey.id} />
+                    <ResponseCount surveyId={survey.id} user={user} />
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <span className={`px-2 py-1 rounded-full text-xs ${
@@ -238,15 +241,15 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   );
 };
 
-// Component to handle async response count
-const ResponseCount: React.FC<{ surveyId: string }> = ({ surveyId }) => {
+// Component to handle async response count  
+const ResponseCount: React.FC<{ surveyId: string; user: User | null }> = ({ surveyId, user }) => {
   const [count, setCount] = React.useState<number>(0);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     const fetchCount = async () => {
       try {
-        const responses = await databaseUtils.getResponsesForSurvey(surveyId);
+        const responses = await databaseUtils.getResponsesForSurvey(surveyId, user || undefined);
         setCount(responses.length);
       } catch (error) {
         setCount(0);
@@ -256,7 +259,7 @@ const ResponseCount: React.FC<{ surveyId: string }> = ({ surveyId }) => {
     };
 
     fetchCount();
-  }, [surveyId]);
+  }, [surveyId, user]);
 
   if (loading) {
     return <span>...</span>;

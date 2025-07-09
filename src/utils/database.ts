@@ -1,6 +1,7 @@
 import { supabase, DatabaseSurvey, DatabaseResponse, isSupabaseConfigured } from '../lib/supabase';
 import { Survey, Response } from '../types/survey';
 import { storageUtils } from './storage';
+import { User } from '../types/auth';
 
 // Fallback to localStorage when Supabase is not configured
 const useFallback = !isSupabaseConfigured;
@@ -42,13 +43,16 @@ const transformDatabaseResponse = (dbResponse: DatabaseResponse): Response => ({
 
 export const databaseUtils = {
   // Survey operations
-  async saveSurvey(survey: Survey): Promise<Survey> {
+  async saveSurvey(survey: Survey, user?: User): Promise<Survey> {
     if (useFallback) {
       storageUtils.saveSurvey(survey);
       return survey;
     }
 
-    const surveyData = transformAppSurvey(survey);
+    const surveyData = {
+      ...transformAppSurvey(survey),
+      user_id: user?.id, // Will be set automatically by trigger if not provided
+    };
     
     const { data, error } = await supabase!
       .from('surveys')
@@ -64,14 +68,19 @@ export const databaseUtils = {
     return transformDatabaseSurvey(data);
   },
 
-  async getSurveys(): Promise<Survey[]> {
+  async getSurveys(user?: User): Promise<Survey[]> {
     if (useFallback) {
       return storageUtils.getSurveys();
     }
 
-    const { data, error } = await supabase!
-      .from('surveys')
-      .select('*')
+    let query = supabase!.from('surveys').select('*');
+    
+    // If user is provided, filter by user_id
+    if (user) {
+      query = query.eq('user_id', user.id);
+    }
+    
+    const { data, error } = await query
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -106,16 +115,20 @@ export const databaseUtils = {
     return transformDatabaseSurvey(data);
   },
 
-  async deleteSurvey(surveyId: string): Promise<void> {
+  async deleteSurvey(surveyId: string, user?: User): Promise<void> {
     if (useFallback) {
       storageUtils.deleteSurvey(surveyId);
       return;
     }
 
-    const { error } = await supabase!
-      .from('surveys')
-      .delete()
-      .eq('id', surveyId);
+    let query = supabase!.from('surveys').delete().eq('id', surveyId);
+    
+    // Add user filter for security (RLS will also enforce this)
+    if (user) {
+      query = query.eq('user_id', user.id);
+    }
+    
+    const { error } = await query;
 
     if (error) {
       console.error('Error deleting survey:', error);
@@ -151,11 +164,25 @@ export const databaseUtils = {
     return transformDatabaseResponse(data);
   },
 
-  async getResponsesForSurvey(surveyId: string): Promise<Response[]> {
+  async getResponsesForSurvey(surveyId: string, user?: User): Promise<Response[]> {
     if (useFallback) {
       return storageUtils.getResponsesForSurvey(surveyId);
     }
 
+    // First verify the user owns this survey (if user is provided)
+    if (user) {
+      const { data: survey, error: surveyError } = await supabase!
+        .from('surveys')
+        .select('user_id')
+        .eq('id', surveyId)
+        .eq('user_id', user.id)
+        .single();
+        
+      if (surveyError || !survey) {
+        throw new Error('Survey not found or access denied');
+      }
+    }
+    
     const { data, error } = await supabase!
       .from('responses')
       .select('*')
@@ -170,14 +197,23 @@ export const databaseUtils = {
     return data.map(transformDatabaseResponse);
   },
 
-  async getAllResponses(): Promise<Response[]> {
+  async getAllResponses(user?: User): Promise<Response[]> {
     if (useFallback) {
       return storageUtils.getResponses();
     }
 
-    const { data, error } = await supabase!
-      .from('responses')
-      .select('*')
+    let query = supabase!.from('responses').select('*');
+    
+    // If user is provided, only get responses to their surveys
+    if (user) {
+      query = query.in('survey_id', 
+        supabase!.from('surveys')
+          .select('id')
+          .eq('user_id', user.id)
+      );
+    }
+    
+    const { data, error } = await query
       .order('submitted_at', { ascending: false });
 
     if (error) {
@@ -189,7 +225,7 @@ export const databaseUtils = {
   },
 
   // Utility functions
-  async checkSurveyLimits(surveyId: string): Promise<{ canSubmit: boolean; reason?: string }> {
+  async checkSurveyLimits(surveyId: string, user?: User): Promise<{ canSubmit: boolean; reason?: string }> {
     if (useFallback) {
       // Simple fallback logic for localStorage
       const surveys = storageUtils.getSurveys();
@@ -245,5 +281,42 @@ export const databaseUtils = {
     }
 
     return { canSubmit: true };
+  },
+
+  // User-specific utility functions
+  async getUserSurveyCount(user: User): Promise<number> {
+    if (useFallback) {
+      return storageUtils.getSurveys().length;
+    }
+
+    const { count, error } = await supabase!
+      .from('surveys')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error getting survey count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  },
+
+  async getUserResponseCount(user: User): Promise<number> {
+    if (useFallback) {
+      return storageUtils.getResponses().length;
+    }
+
+    const { count, error } = await supabase!
+      .from('responses')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error getting response count:', error);
+      return 0;
+    }
+
+    return count || 0;
   }
 };

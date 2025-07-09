@@ -5,14 +5,16 @@ import { Bar, Pie, Line } from 'react-chartjs-2';
 import { Survey, Response } from '../types/survey';
 import { databaseUtils } from '../utils/database';
 import { exportUtils } from '../utils/export';
+import { User } from '../types/auth';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement);
 
 interface AdminDashboardProps {
   onBack: () => void;
+  user: User | null;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, user }) => {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
   const [responses, setResponses] = useState<Response[]>([]);
@@ -24,7 +26,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     const loadSurveys = async () => {
       setIsLoading(true);
       try {
-        const allSurveys = await databaseUtils.getSurveys();
+        const allSurveys = await databaseUtils.getSurveys(user || undefined);
         setSurveys(allSurveys);
         if (allSurveys.length > 0) {
           setSelectedSurvey(allSurveys[0]);
@@ -43,7 +45,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     const loadResponses = async () => {
       if (selectedSurvey) {
         try {
-          let surveyResponses = await databaseUtils.getResponsesForSurvey(selectedSurvey.id);
+          let surveyResponses = await databaseUtils.getResponsesForSurvey(selectedSurvey.id, user || undefined);
       
           // Apply date filter
           if (dateRange.start && dateRange.end) {
@@ -61,7 +63,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     };
 
     loadResponses();
-  }, [selectedSurvey, dateRange]);
+  }, [selectedSurvey, dateRange, user]);
 
   const getResponsesOverTime = () => {
     const last30Days = Array.from({ length: 30 }, (_, i) => {

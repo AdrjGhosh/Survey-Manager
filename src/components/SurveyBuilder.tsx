@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Edit3, Save, ArrowLeft, Eye, ToggleLeft, ToggleRight, Share2, Copy, Calendar, Users } from 'lucide-react';
 import { Question, Survey } from '../types/survey';
 import { databaseUtils } from '../utils/database';
+import { User } from '../types/auth';
 
 interface SurveyBuilderProps {
   survey?: Survey;
   onSave: (survey: Survey) => void;
   onCancel: () => void;
+  user: User | null;
 }
 
 const questionTypes = [
@@ -18,7 +20,7 @@ const questionTypes = [
   { value: 'number', label: 'Number' },
 ];
 
-export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, onCancel }) => {
+export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, onCancel, user }) => {
   const [title, setTitle] = useState(survey?.title || '');
   const [description, setDescription] = useState(survey?.description || '');
   const [questions, setQuestions] = useState<Question[]>(survey?.questions || []);
@@ -76,7 +78,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
       expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
     };
 
-      const savedSurvey = await databaseUtils.saveSurvey(surveyData);
+      const savedSurvey = await databaseUtils.saveSurvey(surveyData, user || undefined);
       onSave(savedSurvey);
     } catch (error) {
       console.error('Failed to save survey:', error);
