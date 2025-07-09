@@ -1,5 +1,9 @@
-import { supabase, DatabaseSurvey, DatabaseResponse } from '../lib/supabase';
+import { supabase, DatabaseSurvey, DatabaseResponse, isSupabaseConfigured } from '../lib/supabase';
 import { Survey, Response } from '../types/survey';
+import { storageUtils } from './storage';
+
+// Fallback to localStorage when Supabase is not configured
+const useFallback = !isSupabaseConfigured;
 
 // Transform database survey to app survey format
 const transformDatabaseSurvey = (dbSurvey: DatabaseSurvey): Survey => ({
@@ -39,9 +43,14 @@ const transformDatabaseResponse = (dbResponse: DatabaseResponse): Response => ({
 export const databaseUtils = {
   // Survey operations
   async saveSurvey(survey: Survey): Promise<Survey> {
+    if (useFallback) {
+      storageUtils.saveSurvey(survey);
+      return survey;
+    }
+
     const surveyData = transformAppSurvey(survey);
     
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('surveys')
       .upsert(surveyData)
       .select()
@@ -56,7 +65,11 @@ export const databaseUtils = {
   },
 
   async getSurveys(): Promise<Survey[]> {
-    const { data, error } = await supabase
+    if (useFallback) {
+      return storageUtils.getSurveys();
+    }
+
+    const { data, error } = await supabase!
       .from('surveys')
       .select('*')
       .order('created_at', { ascending: false });
@@ -70,7 +83,11 @@ export const databaseUtils = {
   },
 
   async getSurveyByPublicId(publicId: string): Promise<Survey | null> {
-    const { data, error } = await supabase
+    if (useFallback) {
+      return storageUtils.getSurveyByPublicId(publicId);
+    }
+
+    const { data, error } = await supabase!
       .from('surveys')
       .select('*')
       .eq('public_id', publicId)
@@ -90,7 +107,12 @@ export const databaseUtils = {
   },
 
   async deleteSurvey(surveyId: string): Promise<void> {
-    const { error } = await supabase
+    if (useFallback) {
+      storageUtils.deleteSurvey(surveyId);
+      return;
+    }
+
+    const { error } = await supabase!
       .from('surveys')
       .delete()
       .eq('id', surveyId);
@@ -103,6 +125,11 @@ export const databaseUtils = {
 
   // Response operations
   async saveResponse(response: Response): Promise<Response> {
+    if (useFallback) {
+      storageUtils.saveResponse(response);
+      return response;
+    }
+
     const responseData = {
       id: response.id,
       survey_id: response.surveyId,
@@ -110,7 +137,7 @@ export const databaseUtils = {
       submitted_at: response.submittedAt,
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('responses')
       .insert(responseData)
       .select()
@@ -125,7 +152,11 @@ export const databaseUtils = {
   },
 
   async getResponsesForSurvey(surveyId: string): Promise<Response[]> {
-    const { data, error } = await supabase
+    if (useFallback) {
+      return storageUtils.getResponsesForSurvey(surveyId);
+    }
+
+    const { data, error } = await supabase!
       .from('responses')
       .select('*')
       .eq('survey_id', surveyId)
@@ -140,7 +171,11 @@ export const databaseUtils = {
   },
 
   async getAllResponses(): Promise<Response[]> {
-    const { data, error } = await supabase
+    if (useFallback) {
+      return storageUtils.getResponses();
+    }
+
+    const { data, error } = await supabase!
       .from('responses')
       .select('*')
       .order('submitted_at', { ascending: false });
@@ -155,7 +190,30 @@ export const databaseUtils = {
 
   // Utility functions
   async checkSurveyLimits(surveyId: string): Promise<{ canSubmit: boolean; reason?: string }> {
-    const { data: survey, error: surveyError } = await supabase
+    if (useFallback) {
+      // Simple fallback logic for localStorage
+      const surveys = storageUtils.getSurveys();
+      const survey = surveys.find(s => s.id === surveyId);
+      
+      if (!survey) {
+        return { canSubmit: false, reason: 'Survey not found' };
+      }
+
+      if (survey.expiresAt && new Date() > new Date(survey.expiresAt)) {
+        return { canSubmit: false, reason: 'Survey has expired' };
+      }
+
+      if (survey.responseLimit) {
+        const responses = storageUtils.getResponsesForSurvey(surveyId);
+        if (responses.length >= survey.responseLimit) {
+          return { canSubmit: false, reason: 'Response limit reached' };
+        }
+      }
+
+      return { canSubmit: true };
+    }
+
+    const { data: survey, error: surveyError } = await supabase!
       .from('surveys')
       .select('response_limit, expires_at')
       .eq('id', surveyId)
@@ -172,7 +230,7 @@ export const databaseUtils = {
 
     // Check response limit
     if (survey.response_limit) {
-      const { count, error: countError } = await supabase
+      const { count, error: countError } = await supabase!
         .from('responses')
         .select('*', { count: 'exact', head: true })
         .eq('survey_id', surveyId);

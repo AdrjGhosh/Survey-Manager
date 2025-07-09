@@ -7,6 +7,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { PublicSurveyTaker } from './components/PublicSurveyTaker';
 import { Survey } from './types/survey';
 import { databaseUtils } from './utils/database';
+import { isSupabaseConfigured } from './lib/supabase';
 
 type View = 'list' | 'create' | 'edit' | 'take' | 'analytics' | 'admin' | 'public';
 
@@ -16,6 +17,7 @@ function App() {
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | undefined>();
   const [publicSurveyId, setPublicSurveyId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSupabaseWarning, setShowSupabaseWarning] = useState(!isSupabaseConfigured);
 
   useEffect(() => {
     const loadSurveys = async () => {
@@ -107,6 +109,30 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {showSupabaseWarning && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-4">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                <span className="text-yellow-600 font-bold">!</span>
+              </div>
+              <div>
+                <p className="text-yellow-800 font-medium">Development Mode</p>
+                <p className="text-yellow-700 text-sm">
+                  Using localStorage for data storage. Click "Connect to Supabase" to set up a database.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSupabaseWarning(false)}
+              className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {currentView === 'list' && (
         <SurveyList
           surveys={surveys}
