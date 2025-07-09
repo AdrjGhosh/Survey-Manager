@@ -1,8 +1,7 @@
 import React from 'react';
-import { Plus, Edit, Trash2, Eye, BarChart3, Calendar, Users, ToggleLeft, ToggleRight, Settings, Share2, Copy, ExternalLink, Smartphone } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, BarChart3, Calendar, Users, ToggleLeft, ToggleRight, Settings, Share2, Copy, ExternalLink } from 'lucide-react';
 import { Survey } from '../types/survey';
-import { storageUtils } from '../utils/storage';
-import { MobileTestingInfo } from './MobileTestingInfo';
+import { databaseUtils } from '../utils/database';
 
 interface SurveyListProps {
   surveys: Survey[];
@@ -23,20 +22,33 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   onViewAdmin,
   onRefresh,
 }) => {
-  const [showMobileInfo, setShowMobileInfo] = React.useState(false);
-  const [selectedSurveyForMobile, setSelectedSurveyForMobile] = React.useState<Survey | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleDeleteSurvey = (surveyId: string) => {
+  const handleDeleteSurvey = async (surveyId: string) => {
     if (window.confirm('Are you sure you want to delete this survey? This action cannot be undone.')) {
-      storageUtils.deleteSurvey(surveyId);
-      onRefresh();
+      setIsLoading(true);
+      try {
+        await databaseUtils.deleteSurvey(surveyId);
+        onRefresh();
+      } catch (error) {
+        alert('Failed to delete survey. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  const toggleSurveyStatus = (survey: Survey) => {
+  const toggleSurveyStatus = async (survey: Survey) => {
+    setIsLoading(true);
+    try {
     const updatedSurvey = { ...survey, isActive: !survey.isActive };
-    storageUtils.saveSurvey(updatedSurvey);
-    onRefresh();
+      await databaseUtils.saveSurvey(updatedSurvey);
+      onRefresh();
+    } catch (error) {
+      alert('Failed to update survey status. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const copyPublicLink = (survey: Survey) => {
@@ -54,13 +66,13 @@ export const SurveyList: React.FC<SurveyListProps> = ({
     }
   };
 
-  const showMobileTestingInfo = (survey: Survey) => {
-    setSelectedSurveyForMobile(survey);
-    setShowMobileInfo(true);
-  };
-
-  const getResponseCount = (surveyId: string) => {
-    return storageUtils.getResponsesForSurvey(surveyId).length;
+  const getResponseCount = async (surveyId: string) => {
+    try {
+      const responses = await databaseUtils.getResponsesForSurvey(surveyId);
+      return responses.length;
+    } catch (error) {
+      return 0;
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -148,7 +160,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Users size={14} />
-                    {getResponseCount(survey.id)} responses
+                    <ResponseCount surveyId={survey.id} />
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <span className={`px-2 py-1 rounded-full text-xs ${
@@ -192,13 +204,6 @@ export const SurveyList: React.FC<SurveyListProps> = ({
                       >
                         <ExternalLink size={14} />
                       </button>
-                      <button
-                        onClick={() => showMobileTestingInfo(survey)}
-                        className="flex items-center gap-1 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 touch-manipulation"
-                        title="Mobile testing info"
-                      >
-                        <Smartphone size={14} />
-                      </button>
                     </>
                   )}
                   
@@ -218,6 +223,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
                   </button>
                   <button
                     onClick={() => handleDeleteSurvey(survey.id)}
+                    disabled={isLoading}
                     className="flex items-center gap-1 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 touch-manipulation"
                   >
                     <Trash2 size={14} />
@@ -228,18 +234,33 @@ export const SurveyList: React.FC<SurveyListProps> = ({
           ))}
         </div>
       )}
-      
-      {showMobileInfo && selectedSurveyForMobile && (
-        <MobileTestingInfo
-          publicUrl={selectedSurveyForMobile.publicId && selectedSurveyForMobile.allowPublicAccess 
-            ? `${window.location.origin}/s/${selectedSurveyForMobile.publicId}` 
-            : undefined}
-          onClose={() => {
-            setShowMobileInfo(false);
-            setSelectedSurveyForMobile(null);
-          }}
-        />
-      )}
     </div>
   );
+};
+
+// Component to handle async response count
+const ResponseCount: React.FC<{ surveyId: string }> = ({ surveyId }) => {
+  const [count, setCount] = React.useState<number>(0);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const responses = await databaseUtils.getResponsesForSurvey(surveyId);
+        setCount(responses.length);
+      } catch (error) {
+        setCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCount();
+  }, [surveyId]);
+
+  if (loading) {
+    return <span>...</span>;
+  }
+
+  return <span>{count} responses</span>;
 };

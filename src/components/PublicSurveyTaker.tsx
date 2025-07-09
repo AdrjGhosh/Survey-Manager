@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { Survey, Question, Response } from '../types/survey';
-import { storageUtils } from '../utils/storage';
+import { databaseUtils } from '../utils/database';
 
 interface PublicSurveyTakerProps {
   survey: Survey;
@@ -13,13 +13,26 @@ export const PublicSurveyTaker: React.FC<PublicSurveyTakerProps> = ({ survey, pu
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [questionId: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [responseCount, setResponseCount] = useState(0);
+
+  // Load response count on component mount
+  React.useEffect(() => {
+    const loadResponseCount = async () => {
+      try {
+        const responses = await databaseUtils.getResponsesForSurvey(survey.id);
+        setResponseCount(responses.length);
+      } catch (error) {
+        console.error('Failed to load response count:', error);
+      }
+    };
+    loadResponseCount();
+  }, [survey.id]);
 
   // Check if survey is expired
   const isExpired = survey.expiresAt && new Date() > new Date(survey.expiresAt);
   
   // Check if response limit is reached
-  const responses = storageUtils.getResponsesForSurvey(survey.id);
-  const isLimitReached = survey.responseLimit && responses.length >= survey.responseLimit;
+  const isLimitReached = survey.responseLimit && responseCount >= survey.responseLimit;
 
   const handleAnswerChange = (questionId: string, value: string | number) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -71,7 +84,7 @@ export const PublicSurveyTaker: React.FC<PublicSurveyTakerProps> = ({ survey, pu
         submittedAt: new Date().toISOString(),
       };
 
-      storageUtils.saveResponse(response);
+      await databaseUtils.saveResponse(response);
       setIsSubmitted(true);
     } catch (error) {
       console.error('Failed to submit response:', error);
@@ -275,7 +288,7 @@ export const PublicSurveyTaker: React.FC<PublicSurveyTakerProps> = ({ survey, pu
             </div>
             {survey.responseLimit && (
               <div className="flex items-center gap-1">
-                <span>{responses.length}/{survey.responseLimit} responses</span>
+                <span>{responseCount}/{survey.responseLimit} responses</span>
               </div>
             )}
             {survey.expiresAt && (

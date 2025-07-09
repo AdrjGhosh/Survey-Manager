@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Send, CheckCircle } from 'lucide-react';
 import { Survey, Question, Response, Answer } from '../types/survey';
-import { storageUtils } from '../utils/storage';
+import { databaseUtils } from '../utils/database';
 
 interface SurveyTakerProps {
   survey: Survey;
@@ -12,6 +12,7 @@ export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack }) => {
   const [answers, setAnswers] = useState<{ [questionId: string]: string | number }>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [questionId: string]: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAnswerChange = (questionId: string, value: string | number) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -47,9 +48,11 @@ export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    setIsSubmitting(true);
+    try {
     const response: Response = {
       id: Date.now().toString(),
       surveyId: survey.id,
@@ -60,8 +63,14 @@ export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack }) => {
       submittedAt: new Date().toISOString(),
     };
 
-    storageUtils.saveResponse(response);
-    setIsSubmitted(true);
+      await databaseUtils.saveResponse(response);
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error('Failed to submit response:', error);
+      alert('Failed to submit response. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderQuestion = (question: Question) => {
@@ -230,10 +239,11 @@ export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack }) => {
         <div className="flex justify-center sm:justify-end pt-6">
           <button
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 font-medium text-sm sm:text-base w-full sm:w-auto justify-center touch-manipulation"
           >
             <Send size={16} />
-            Submit Survey
+            {isSubmitting ? 'Submitting...' : 'Submit Survey'}
           </button>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Download, Users, BarChart3, Calendar } from 'lucide-react';
 import { Survey, Response } from '../types/survey';
-import { storageUtils } from '../utils/storage';
+import { databaseUtils } from '../utils/database';
 
 interface SurveyAnalyticsProps {
   survey: Survey;
@@ -9,7 +9,24 @@ interface SurveyAnalyticsProps {
 }
 
 export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack }) => {
-  const responses = storageUtils.getResponsesForSurvey(survey.id);
+  const [responses, setResponses] = React.useState<Response[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadResponses = async () => {
+      setIsLoading(true);
+      try {
+        const responseData = await databaseUtils.getResponsesForSurvey(survey.id);
+        setResponses(responseData);
+      } catch (error) {
+        console.error('Failed to load responses:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadResponses();
+  }, [survey.id]);
 
   const getQuestionAnalytics = (questionId: string) => {
     const question = survey.questions.find(q => q.id === questionId);
@@ -110,7 +127,17 @@ export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack
       </div>
 
       {responses.length === 0 ? (
-        <div className="text-center py-16">
+        isLoading ? (
+          <div className="text-center py-16">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+              <div className="text-gray-400 mb-4">
+                <BarChart3 className="w-16 h-16 mx-auto animate-spin" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading analytics...</h3>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-16">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
             <div className="text-gray-400 mb-4">
               <BarChart3 className="w-16 h-16 mx-auto" />
@@ -119,6 +146,7 @@ export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack
             <p className="text-gray-600">Share your survey to start collecting responses</p>
           </div>
         </div>
+        )
       ) : (
         <div className="space-y-8">
           {survey.questions.map((question) => {

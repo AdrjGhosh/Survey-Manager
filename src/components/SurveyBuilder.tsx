@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit3, Save, ArrowLeft, Eye, ToggleLeft, ToggleRight, Share2, Copy, Calendar, Users } from 'lucide-react';
 import { Question, Survey } from '../types/survey';
-import { storageUtils } from '../utils/storage';
+import { databaseUtils } from '../utils/database';
 
 interface SurveyBuilderProps {
   survey?: Survey;
@@ -27,6 +27,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
   const [responseLimit, setResponseLimit] = useState(survey?.responseLimit || '');
   const [expiresAt, setExpiresAt] = useState(survey?.expiresAt ? survey.expiresAt.split('T')[0] : '');
   const [showShareOptions, setShowShareOptions] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const addQuestion = () => {
     const newQuestion: Question = {
@@ -49,7 +50,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
     setQuestions(questions.filter(q => q.id !== questionId));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim()) {
       alert('Please enter a survey title');
       return;
@@ -60,6 +61,8 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
       return;
     }
 
+    setIsSaving(true);
+    try {
     const surveyData: Survey = {
       id: survey?.id || Date.now().toString(),
       title: title.trim(),
@@ -73,8 +76,14 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
       expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
     };
 
-    storageUtils.saveSurvey(surveyData);
-    onSave(surveyData);
+      const savedSurvey = await databaseUtils.saveSurvey(surveyData);
+      onSave(savedSurvey);
+    } catch (error) {
+      console.error('Failed to save survey:', error);
+      alert('Failed to save survey. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const generatePublicId = () => {
@@ -258,10 +267,11 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
         <div className="flex items-center gap-3">
           <button
             onClick={handleSave}
+            disabled={isSaving}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             <Save size={16} />
-            Save Survey
+            {isSaving ? 'Saving...' : 'Save Survey'}
           </button>
         </div>
       </div>

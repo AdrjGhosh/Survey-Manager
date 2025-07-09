@@ -3,7 +3,7 @@ import { ArrowLeft, Download, Filter, Calendar, TrendingUp, Users, BarChart3, Pi
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import { Survey, Response } from '../types/survey';
-import { storageUtils } from '../utils/storage';
+import { databaseUtils } from '../utils/database';
 import { exportUtils } from '../utils/export';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement);
@@ -18,29 +18,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [responses, setResponses] = useState<Response[]>([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const allSurveys = storageUtils.getSurveys();
-    setSurveys(allSurveys);
-    if (allSurveys.length > 0) {
-      setSelectedSurvey(allSurveys[0]);
-    }
+    const loadSurveys = async () => {
+      setIsLoading(true);
+      try {
+        const allSurveys = await databaseUtils.getSurveys();
+        setSurveys(allSurveys);
+        if (allSurveys.length > 0) {
+          setSelectedSurvey(allSurveys[0]);
+        }
+      } catch (error) {
+        console.error('Failed to load surveys:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSurveys();
   }, []);
 
   useEffect(() => {
-    if (selectedSurvey) {
-      let surveyResponses = storageUtils.getResponsesForSurvey(selectedSurvey.id);
+    const loadResponses = async () => {
+      if (selectedSurvey) {
+        try {
+          let surveyResponses = await databaseUtils.getResponsesForSurvey(selectedSurvey.id);
       
-      // Apply date filter
-      if (dateRange.start && dateRange.end) {
-        surveyResponses = surveyResponses.filter(response => {
-          const responseDate = new Date(response.submittedAt);
-          return responseDate >= new Date(dateRange.start) && responseDate <= new Date(dateRange.end);
-        });
+          // Apply date filter
+          if (dateRange.start && dateRange.end) {
+            surveyResponses = surveyResponses.filter(response => {
+              const responseDate = new Date(response.submittedAt);
+              return responseDate >= new Date(dateRange.start) && responseDate <= new Date(dateRange.end);
+            });
+          }
+      
+          setResponses(surveyResponses);
+        } catch (error) {
+          console.error('Failed to load responses:', error);
+        }
       }
-      
-      setResponses(surveyResponses);
-    }
+    };
+
+    loadResponses();
   }, [selectedSurvey, dateRange]);
 
   const getResponsesOverTime = () => {

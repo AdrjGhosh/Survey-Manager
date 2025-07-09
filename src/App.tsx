@@ -6,7 +6,7 @@ import { SurveyAnalytics } from './components/SurveyAnalytics';
 import { AdminDashboard } from './components/AdminDashboard';
 import { PublicSurveyTaker } from './components/PublicSurveyTaker';
 import { Survey } from './types/survey';
-import { storageUtils } from './utils/storage';
+import { databaseUtils } from './utils/database';
 
 type View = 'list' | 'create' | 'edit' | 'take' | 'analytics' | 'admin' | 'public';
 
@@ -15,26 +15,54 @@ function App() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | undefined>();
   const [publicSurveyId, setPublicSurveyId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setSurveys(storageUtils.getSurveys());
+    const loadSurveys = async () => {
+      setIsLoading(true);
+      try {
+        const surveysData = await databaseUtils.getSurveys();
+        setSurveys(surveysData);
+      } catch (error) {
+        console.error('Failed to load surveys:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSurveys();
     
     // Check if this is a public survey link
     const path = window.location.pathname;
     const publicMatch = path.match(/^\/s\/(.+)$/);
     if (publicMatch) {
       const surveyId = publicMatch[1];
-      const survey = storageUtils.getSurveyByPublicId(surveyId);
-      if (survey && survey.isActive) {
-        setSelectedSurvey(survey);
-        setPublicSurveyId(surveyId);
-        setCurrentView('public');
-      }
+      const loadPublicSurvey = async () => {
+        try {
+          const survey = await databaseUtils.getSurveyByPublicId(surveyId);
+          if (survey && survey.isActive) {
+            setSelectedSurvey(survey);
+            setPublicSurveyId(surveyId);
+            setCurrentView('public');
+          }
+        } catch (error) {
+          console.error('Failed to load public survey:', error);
+        }
+      };
+      loadPublicSurvey();
     }
   }, []);
 
-  const refreshSurveys = () => {
-    setSurveys(storageUtils.getSurveys());
+  const refreshSurveys = async () => {
+    setIsLoading(true);
+    try {
+      const surveysData = await databaseUtils.getSurveys();
+      setSurveys(surveysData);
+    } catch (error) {
+      console.error('Failed to refresh surveys:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCreateSurvey = () => {
