@@ -141,13 +141,6 @@ const AppContent: React.FC = () => {
   if (!user && isSupabaseConfigured) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Debug info for troubleshooting */}
-        <div className="bg-blue-50 border-b border-blue-200 p-2 text-xs">
-          <div className="max-w-6xl mx-auto text-blue-800">
-            Debug: Supabase configured, no user authenticated. Environment: {import.meta.env.MODE}
-          </div>
-        </div>
-        
         <div className="max-w-4xl mx-auto p-6">
           <div className="text-center py-16">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 max-w-md mx-auto">
@@ -173,6 +166,13 @@ const AppContent: React.FC = () => {
                   Create Account
                 </button>
               </div>
+              
+              {/* Debug info for troubleshooting */}
+              {import.meta.env.MODE === 'development' && (
+                <div className="mt-6 p-3 bg-gray-100 rounded text-xs text-gray-600">
+                  Debug: Supabase configured, no user authenticated
+                </div>
+              )}
             </div>
           </div>
         </div>

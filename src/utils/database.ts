@@ -49,6 +49,11 @@ export const databaseUtils = {
       return survey;
     }
 
+    // Ensure user is authenticated for Supabase operations
+    if (!user) {
+      throw new Error('Authentication required to save surveys');
+    }
+
     // Enhanced error logging for debugging
     console.log('Attempting to save survey:', {
       surveyId: survey.id,
@@ -57,8 +62,9 @@ export const databaseUtils = {
       isSupabaseConfigured
     });
 
-    const surveyData = {
+    const surveyData: any = {
       ...transformAppSurvey(survey),
+      user_id: user.id, // Explicitly set user_id
     };
 
     // Remove undefined values that might cause issues
@@ -68,27 +74,49 @@ export const databaseUtils = {
       }
     });
 
-    console.log('Survey data being sent:', surveyData);
-    
-    const { data, error } = await supabase!
-      .from('surveys')
-      .upsert(surveyData)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Detailed error saving survey:', {
-        error,
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
-      throw new Error('Failed to save survey');
+    // Ensure required fields are present
+    if (!surveyData.title || !surveyData.questions) {
+      throw new Error('Survey title and questions are required');
     }
 
-    console.log('Survey saved successfully:', data);
-    return transformDatabaseSurvey(data);
+    console.log('Survey data being sent:', surveyData);
+    
+    try {
+      const { data, error } = await supabase!
+        .from('surveys')
+        .upsert(surveyData, {
+          onConflict: 'id'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Detailed error saving survey:', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        
+        // Provide more specific error messages
+        if (error.code === '23505') {
+          throw new Error('A survey with this ID already exists');
+        } else if (error.code === '42501') {
+          throw new Error('Permission denied. Please ensure you are signed in.');
+        } else if (error.message.includes('violates row-level security')) {
+          throw new Error('Access denied. Please sign in to save surveys.');
+        } else {
+          throw new Error(`Database error: ${error.message}`);
+        }
+      }
+
+      console.log('Survey saved successfully:', data);
+      return transformDatabaseSurvey(data);
+    } catch (dbError: any) {
+      console.error('Database operation failed:', dbError);
+      throw dbError;
+    }
   },
 
   async getSurveys(user?: User): Promise<Survey[]> {

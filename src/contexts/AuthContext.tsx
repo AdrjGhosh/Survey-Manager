@@ -97,13 +97,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
     
-    const { error } = await supabase!.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase!.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
+      if (error) {
+        console.error('Sign in error:', error);
+        setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
+        throw error;
+      }
+
+      console.log('Sign in successful:', data.user?.email);
+    } catch (error) {
+      console.error('Sign in failed:', error);
+      setAuthState(prev => ({ ...prev, loading: false }));
       throw error;
     }
   };
@@ -115,13 +124,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setAuthState(prev => ({ ...prev, loading: true, error: null }));
     
-    const { error } = await supabase!.auth.signUp({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase!.auth.signUp({
+        email,
+        password,
+      });
 
-    if (error) {
-      setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
+      if (error) {
+        console.error('Sign up error:', error);
+        setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
+        throw error;
+      }
+
+      console.log('Sign up successful:', data.user?.email);
+    } catch (error) {
+      console.error('Sign up failed:', error);
+      setAuthState(prev => ({ ...prev, loading: false }));
       throw error;
     }
   };

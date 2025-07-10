@@ -63,33 +63,44 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
       return;
     }
 
-    // Check if user is authenticated when using Supabase
-    if (!user && isSupabaseConfigured) {
-      alert('You must be signed in to save surveys');
+    // Enhanced authentication check
+    if (isSupabaseConfigured && !user) {
+      alert('You must be signed in to save surveys. Please sign in and try again.');
+      return;
+    }
+
+    // Validate questions have required fields
+    const invalidQuestions = questions.filter(q => !q.title.trim());
+    if (invalidQuestions.length > 0) {
+      alert('All questions must have a title');
       return;
     }
 
     setIsSaving(true);
     try {
-    const surveyData: Survey = {
-      id: survey?.id || Date.now().toString(),
-      title: title.trim(),
-      description: description.trim(),
-      questions,
-      createdAt: survey?.createdAt || new Date().toISOString(),
-      isActive: survey?.isActive ?? true,
-      publicId: survey?.publicId || generatePublicId(),
-      allowPublicAccess,
-      responseLimit: responseLimit ? parseInt(responseLimit) : undefined,
-      expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
-    };
+      const surveyData: Survey = {
+        id: survey?.id || Date.now().toString(),
+        title: title.trim(),
+        description: description.trim(),
+        questions: questions.map(q => ({
+          ...q,
+          title: q.title.trim()
+        })),
+        createdAt: survey?.createdAt || new Date().toISOString(),
+        isActive: survey?.isActive ?? true,
+        publicId: survey?.publicId || generatePublicId(),
+        allowPublicAccess,
+        responseLimit: responseLimit ? parseInt(responseLimit) : undefined,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+      };
 
       console.log('Saving survey with user:', user?.email);
-      const savedSurvey = await databaseUtils.saveSurvey(surveyData, user || undefined);
+      const savedSurvey = await databaseUtils.saveSurvey(surveyData, user!);
       onSave(savedSurvey);
     } catch (error) {
       console.error('Failed to save survey:', error);
-      alert(`Failed to save survey: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to save survey: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }
