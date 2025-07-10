@@ -63,6 +63,12 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
       return;
     }
 
+    // Check if user is authenticated when using Supabase
+    if (!user && isSupabaseConfigured) {
+      alert('You must be signed in to save surveys');
+      return;
+    }
+
     setIsSaving(true);
     try {
     const surveyData: Survey = {
@@ -78,11 +84,12 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
       expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
     };
 
+      console.log('Saving survey with user:', user?.email);
       const savedSurvey = await databaseUtils.saveSurvey(surveyData, user || undefined);
       onSave(savedSurvey);
     } catch (error) {
       console.error('Failed to save survey:', error);
-      alert('Failed to save survey. Please try again.');
+      alert(`Failed to save survey: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
     } finally {
       setIsSaving(false);
     }

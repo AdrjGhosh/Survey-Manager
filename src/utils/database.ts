@@ -49,10 +49,26 @@ export const databaseUtils = {
       return survey;
     }
 
+    // Enhanced error logging for debugging
+    console.log('Attempting to save survey:', {
+      surveyId: survey.id,
+      hasUser: !!user,
+      userId: user?.id,
+      isSupabaseConfigured
+    });
+
     const surveyData = {
       ...transformAppSurvey(survey),
-      user_id: user?.id, // Will be set automatically by trigger if not provided
     };
+
+    // Remove undefined values that might cause issues
+    Object.keys(surveyData).forEach(key => {
+      if (surveyData[key as keyof typeof surveyData] === undefined) {
+        delete surveyData[key as keyof typeof surveyData];
+      }
+    });
+
+    console.log('Survey data being sent:', surveyData);
     
     const { data, error } = await supabase!
       .from('surveys')
@@ -61,10 +77,17 @@ export const databaseUtils = {
       .single();
 
     if (error) {
-      console.error('Error saving survey:', error);
+      console.error('Detailed error saving survey:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       throw new Error('Failed to save survey');
     }
 
+    console.log('Survey saved successfully:', data);
     return transformDatabaseSurvey(data);
   },
 

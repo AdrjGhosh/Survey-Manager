@@ -35,6 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         created_at: new Date().toISOString(),
       };
       
+      console.log('Using mock user for development:', mockUser);
       setAuthState({
         user: mockUser,
         loading: false,
@@ -43,8 +44,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    console.log('Initializing Supabase authentication...');
+    
     // Get initial session
     supabase!.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        userEmail: session?.user?.email
+      });
+      
       setAuthState(prev => ({
         ...prev,
         user: session?.user ? {
@@ -59,6 +68,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const { data: { subscription } } = supabase!.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', {
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id
+        });
+        
         setAuthState(prev => ({
           ...prev,
           user: session?.user ? {
