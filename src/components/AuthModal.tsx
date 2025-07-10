@@ -105,10 +105,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center gap-2 text-yellow-800">
               <AlertCircle size={16} />
-              <span className="font-medium">Database Required</span>
+              <span className="font-medium">Database Connection Issue</span>
             </div>
             <p className="text-yellow-700 text-sm mt-1">
-              User authentication requires a Supabase database connection. Please click "Connect to Supabase" to set up your database.
+              Unable to connect to Supabase database. Please check your environment variables and refresh the page.
             </p>
           </div>
         )}

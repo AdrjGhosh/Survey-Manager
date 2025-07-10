@@ -25,6 +25,15 @@ const AppContent: React.FC = () => {
   const [showSupabaseWarning, setShowSupabaseWarning] = useState(!isSupabaseConfigured);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // Debug logging for deployment verification
+  useEffect(() => {
+    console.log('App Configuration Check:', {
+      isSupabaseConfigured,
+      hasUser: !!user,
+      loading,
+      environment: import.meta.env.MODE
+    });
+  }, [user, loading]);
   useEffect(() => {
     const loadSurveys = async () => {
       setIsLoading(true);

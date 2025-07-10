@@ -3,12 +3,21 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Debug logging for deployment verification
+console.log('Supabase Configuration Check:', {
+  hasUrl: !!supabaseUrl,
+  hasKey: !!supabaseAnonKey,
+  urlPreview: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'Not found',
+  keyPreview: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'Not found'
+});
 // Create a mock client if environment variables are missing (for development)
 const createSupabaseClient = () => {
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase environment variables not found. Using mock client for development.');
+    console.warn('Supabase environment variables not found. Using localStorage for development.');
     return null;
   }
+  
+  console.log('✅ Supabase client created successfully');
   return createClient(supabaseUrl, supabaseAnonKey);
 };
 
