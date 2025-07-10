@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Edit3, Save, ArrowLeft, Eye, ToggleLeft, ToggleRight, Share2, Copy, Calendar, Users } from 'lucide-react';
 import { Question, Survey } from '../types/survey';
 import { databaseUtils } from '../utils/database';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { User } from '../types/auth';
 
 interface SurveyBuilderProps {
