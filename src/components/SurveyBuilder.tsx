@@ -5,6 +5,20 @@ import { databaseUtils } from '../utils/database';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { User } from '../types/auth';
 
+// Generate a proper UUID v4
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Generate a URL-safe public ID
+const generatePublicId = () => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
 interface SurveyBuilderProps {
   survey?: Survey;
   onSave: (survey: Survey) => void;
@@ -34,7 +48,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
 
   const addQuestion = () => {
     const newQuestion: Question = {
-      id: Date.now().toString(),
+      id: generateUUID(),
       type: 'text',
       title: 'New Question',
       required: false,
@@ -80,7 +94,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
     setIsSaving(true);
     try {
       const surveyData: Survey = {
-        id: survey?.id || Date.now().toString(),
+        id: survey?.id || generateUUID(),
         title: title.trim(),
         description: description.trim(),
         questions: questions.map(q => ({
@@ -105,10 +119,6 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const generatePublicId = () => {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   };
 
   const getPublicUrl = () => {

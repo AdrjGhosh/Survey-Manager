@@ -4,6 +4,15 @@ import { Survey, Question, Response, Answer } from '../types/survey';
 import { databaseUtils } from '../utils/database';
 import { User } from '../types/auth';
 
+// Generate a proper UUID v4
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 interface SurveyTakerProps {
   survey: Survey;
   onBack: () => void;
@@ -56,7 +65,7 @@ export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack, user }
     setIsSubmitting(true);
     try {
     const response: Response = {
-      id: Date.now().toString(),
+      id: generateUUID(),
       surveyId: survey.id,
       answers: Object.entries(answers).map(([questionId, value]) => ({
         questionId,
