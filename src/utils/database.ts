@@ -220,7 +220,7 @@ export const databaseUtils = {
     try {
       const { data, error } = await supabase!
         .from('responses')
-        .insert(responseData)
+        .insert([responseData])
         .select()
         .single();
 
@@ -239,6 +239,8 @@ export const databaseUtils = {
           throw new Error('Survey not found or no longer accepting responses');
         } else if (error.code === '42501') {
           throw new Error('Permission denied. Survey may be inactive.');
+        } else if (error.message.includes('infinite recursion')) {
+          throw new Error('Database configuration error. Please contact support.');
         } else if (error.message.includes('violates row-level security')) {
           throw new Error('Unable to submit response. Survey may be inactive or expired.');
         } else {
