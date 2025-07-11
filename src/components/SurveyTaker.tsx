@@ -64,21 +64,28 @@ export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack, user }
 
     setIsSubmitting(true);
     try {
-    const response: Response = {
-      id: generateUUID(),
-      surveyId: survey.id,
-      answers: Object.entries(answers).map(([questionId, value]) => ({
-        questionId,
-        value
-      })),
-      submittedAt: new Date().toISOString(),
-    };
+      const response: Response = {
+        id: generateUUID(),
+        surveyId: survey.id,
+        answers: Object.entries(answers).map(([questionId, value]) => ({
+          questionId,
+          value
+        })),
+        submittedAt: new Date().toISOString(),
+      };
+
+      console.log('Submitting response:', {
+        surveyId: response.surveyId,
+        answersCount: response.answers.length,
+        hasUser: !!user
+      });
 
       await databaseUtils.saveResponse(response);
       setIsSubmitted(true);
     } catch (error) {
       console.error('Failed to submit response:', error);
-      alert('Failed to submit response. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to submit response: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

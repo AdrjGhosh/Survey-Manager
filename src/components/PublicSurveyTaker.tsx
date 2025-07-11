@@ -93,11 +93,18 @@ export const PublicSurveyTaker: React.FC<PublicSurveyTakerProps> = ({ survey, pu
         submittedAt: new Date().toISOString(),
       };
 
+      console.log('Submitting public response:', {
+        surveyId: response.surveyId,
+        publicId: publicId,
+        answersCount: response.answers.length
+      });
+
       await databaseUtils.saveResponse(response);
       setIsSubmitted(true);
     } catch (error) {
       console.error('Failed to submit response:', error);
-      alert('Failed to submit response. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to submit response: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

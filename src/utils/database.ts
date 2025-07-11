@@ -203,25 +203,55 @@ export const databaseUtils = {
       return response;
     }
 
+    console.log('Attempting to save response:', {
+      responseId: response.id,
+      surveyId: response.surveyId,
+      answersCount: response.answers.length
+    });
+
     const responseData = {
       id: response.id,
       survey_id: response.surveyId,
       answers: response.answers,
       submitted_at: response.submittedAt,
+      // Don't set user_id for public responses - let the trigger handle it
     };
 
-    const { data, error } = await supabase!
-      .from('responses')
-      .insert(responseData)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase!
+        .from('responses')
+        .insert(responseData)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error saving response:', error);
-      throw new Error('Failed to save response');
+      if (error) {
+        console.error('Detailed error saving response:', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          responseData
+        });
+        
+        // Provide more specific error messages
+        if (error.code === '23503') {
+          throw new Error('Survey not found or no longer accepting responses');
+        } else if (error.code === '42501') {
+          throw new Error('Permission denied. Survey may be inactive.');
+        } else if (error.message.includes('violates row-level security')) {
+          throw new Error('Unable to submit response. Survey may be inactive or expired.');
+        } else {
+          throw new Error(`Database error: ${error.message}`);
+        }
+      }
+
+      console.log('Response saved successfully:', data);
+      return transformDatabaseResponse(data);
+    } catch (dbError: any) {
+      console.error('Database operation failed:', dbError);
+      throw dbError;
     }
-
-    return transformDatabaseResponse(data);
   },
 
   async getResponsesForSurvey(surveyId: string, user?: User): Promise<Response[]> {
