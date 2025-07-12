@@ -203,55 +203,58 @@ export const databaseUtils = {
       return response;
     }
 
-    console.log('Attempting to save response:', {
-      responseId: response.id,
-      surveyId: response.surveyId,
-      answersCount: response.answers.length
-    });
+    if (import.meta.env.MODE === 'development') {
+      console.log('Attempting to save response:', {
+        responseId: response.id,
+        surveyId: response.surveyId,
+        answersCount: response.answers.length
+      });
+    }
 
     const responseData = {
       id: response.id,
       survey_id: response.surveyId,
       answers: response.answers,
       submitted_at: response.submittedAt,
-      // Don't set user_id for public responses - let the trigger handle it
+      // user_id will be set by trigger if user is authenticated
     };
 
     try {
       const { data, error } = await supabase!
         .from('responses')
         .insert([responseData])
-        .select()
+        .select('*')
         .single();
 
       if (error) {
-        console.error('Detailed error saving response:', {
-          error,
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          responseData
-        });
+        if (import.meta.env.MODE === 'development') {
+          console.error('Detailed error saving response:', {
+            error,
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          });
+        }
         
-        // Provide more specific error messages
-        if (error.code === '23503') {
-          throw new Error('Survey not found or no longer accepting responses');
-        } else if (error.code === '42501') {
-          throw new Error('Permission denied. Survey may be inactive.');
-        } else if (error.message.includes('infinite recursion')) {
-          throw new Error('Database configuration error. Please contact support.');
-        } else if (error.message.includes('violates row-level security')) {
-          throw new Error('Unable to submit response. Survey may be inactive or expired.');
+        // Simplified error handling
+        if (error.message.includes('infinite recursion')) {
+          throw new Error('Database policy error. Please run the latest migration.');
+        } else if (error.code === '23503') {
+          throw new Error('Survey not found');
         } else {
-          throw new Error(`Database error: ${error.message}`);
+          throw new Error(`Failed to save response: ${error.message}`);
         }
       }
 
-      console.log('Response saved successfully:', data);
+      if (import.meta.env.MODE === 'development') {
+        console.log('Response saved successfully:', data);
+      }
       return transformDatabaseResponse(data);
     } catch (dbError: any) {
-      console.error('Database operation failed:', dbError);
+      if (import.meta.env.MODE === 'development') {
+        console.error('Database operation failed:', dbError);
+      }
       throw dbError;
     }
   },
