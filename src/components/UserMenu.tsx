@@ -21,7 +21,7 @@ export const UserMenu: React.FC = () => {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] touch-manipulation"
       >
         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
           <User size={16} className="text-white" />
