@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
+import { InstitutionalHeader } from './components/InstitutionalHeader';
+import { InstitutionalFooter } from './components/InstitutionalFooter';
 import { SurveyList } from './components/SurveyList';
 import { SurveyBuilder } from './components/SurveyBuilder';
 import { SurveyTaker } from './components/SurveyTaker';
@@ -187,6 +189,8 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <InstitutionalHeader />
+      
       {showSupabaseWarning && (
         <div className="bg-yellow-50 border-b border-yellow-200 p-4">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -269,6 +273,8 @@ const AppContent: React.FC = () => {
           publicId={publicSurveyId!}
         />
       )}
+      
+      <InstitutionalFooter />
     </div>
   );
 };
