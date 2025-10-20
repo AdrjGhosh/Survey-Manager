@@ -13,13 +13,28 @@ const generateUUID = () => {
   });
 };
 
-interface SurveyTakerProps {
-  survey: Survey;
-  onBack: () => void;
+interface SurveyBuilderProps {
+  survey?: Survey;
+  onSave: (survey: Survey) => void;
+  onCancel: () => void;
   user: User | null;
 }
 
-export const SurveyBuilder: React.FC<SurveyTakerProps> = ({ survey, onBack, user }) => {
+export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, onCancel, user }) => {
+  // Create default survey if none provided (create mode)
+  const currentSurvey = survey || {
+    id: generateUUID(),
+    publicId: generateUUID(),
+    userId: user?.id || '',
+    title: '',
+    description: '',
+    questions: [],
+    isActive: true,
+    allowPublicAccess: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
   const [answers, setAnswers] = useState<{ [questionId: string]: string | number | string[] }>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [questionId: string]: string }>({});
@@ -35,7 +50,7 @@ export const SurveyBuilder: React.FC<SurveyTakerProps> = ({ survey, onBack, user
   const validateForm = () => {
     const newErrors: { [questionId: string]: string } = {};
     
-    survey.questions.forEach(question => {
+    currentSurvey.questions.forEach(question => {
       if (question.required && !answers[question.id]) {
         newErrors[question.id] = 'This field is required';
       }
@@ -66,7 +81,7 @@ export const SurveyBuilder: React.FC<SurveyTakerProps> = ({ survey, onBack, user
     try {
       const response: Response = {
         id: generateUUID(),
-        surveyId: survey.id,
+        surveyId: currentSurvey.id,
         answers: Object.entries(answers).map(([questionId, value]) => ({
           questionId,
           value
@@ -75,7 +90,7 @@ export const SurveyBuilder: React.FC<SurveyTakerProps> = ({ survey, onBack, user
       };
 
       console.log('Submitting response:', {
-        surveyId: response.surveyId,
+        surveyId: currentSurvey.id,
         answersCount: response.answers.length,
         hasUser: !!user
       });
@@ -224,7 +239,7 @@ export const SurveyBuilder: React.FC<SurveyTakerProps> = ({ survey, onBack, user
             Your answers have been submitted successfully.
           </p>
           <button
-            onClick={onBack}
+            onClick={onCancel}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 font-medium text-sm sm:text-base"
           >
             Back to Surveys
@@ -238,21 +253,21 @@ export const SurveyBuilder: React.FC<SurveyTakerProps> = ({ survey, onBack, user
     <div className="max-w-2xl mx-auto p-4 sm:p-6 safe-area-inset">
       <div className="flex items-center gap-4 mb-6 sm:mb-8">
         <button
-          onClick={onBack}
+          onClick={onCancel}
           className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
         >
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{survey.title}</h1>
-          {survey.description && (
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">{survey.description}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{currentSurvey.title || 'New Survey'}</h1>
+          {currentSurvey.description && (
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">{currentSurvey.description}</p>
           )}
         </div>
       </div>
 
       <div className="space-y-4 sm:space-y-6">
-        {survey.questions.map(renderQuestion)}
+        {currentSurvey.questions.map(renderQuestion)}
         
         <div className="flex justify-center sm:justify-end pt-6">
           <button
