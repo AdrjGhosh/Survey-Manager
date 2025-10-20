@@ -30,6 +30,7 @@ const questionTypes = [
   { value: 'text', label: 'Short Text' },
   { value: 'textarea', label: 'Long Text' },
   { value: 'multiple-choice', label: 'Multiple Choice' },
+  { value: 'multiple-select', label: 'Multiple Select' },
   { value: 'rating', label: 'Rating' },
   { value: 'email', label: 'Email' },
   { value: 'number', label: 'Number' },
@@ -184,7 +185,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
               </select>
             </div>
 
-            {question.type === 'multiple-choice' && (
+            {(question.type === 'multiple-choice' || question.type === 'multiple-select') && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Options
@@ -265,11 +266,13 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, on
               Type: {questionTypes.find(t => t.value === question.type)?.label}
               {question.required && <span className="text-red-500 ml-1">*</span>}
             </p>
-            {question.type === 'multiple-choice' && question.options && (
+            {(question.type === 'multiple-choice' || question.type === 'multiple-select') && question.options && (
               <div className="space-y-1">
                 {question.options.map((option, index) => (
                   <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
-                    <div className="w-3 h-3 border border-gray-300 rounded-full"></div>
+                    <div className={`w-3 h-3 border border-gray-300 ${
+                      question.type === 'multiple-select' ? 'rounded' : 'rounded-full'
+                    }`}></div>
                     {option}
                   </div>
                 ))}

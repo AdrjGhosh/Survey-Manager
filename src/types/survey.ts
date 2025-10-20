@@ -1,6 +1,6 @@
 export interface Question {
   id: string;
-  type: 'text' | 'multiple-choice' | 'rating' | 'email' | 'number' | 'textarea';
+  type: 'text' | 'multiple-choice' | 'multiple-select' | 'rating' | 'email' | 'number' | 'textarea';
   title: string;
   required: boolean;
   options?: string[];
@@ -22,7 +22,7 @@ export interface Survey {
 
 export interface Answer {
   questionId: string;
-  value: string | number;
+  value: string | number | string[];
 }
 
 export interface Response {
