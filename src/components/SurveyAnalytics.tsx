@@ -44,6 +44,18 @@ export const SurveyAnalytics: React.FC<SurveyAnalyticsProps> = ({ survey, onBack
       return { type: 'choice', distribution };
     }
     
+    if (question.type === 'multiple-select') {
+      const distribution: { [key: string]: number } = {};
+      answers.forEach(answer => {
+        if (Array.isArray(answer)) {
+          answer.forEach(choice => {
+            distribution[choice] = (distribution[choice] || 0) + 1;
+          });
+        }
+      });
+      return { type: 'choice', distribution };
+    }
+    
     if (question.type === 'rating') {
       const ratings = answers.map(a => Number(a)).filter(n => !isNaN(n));
       const average = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;

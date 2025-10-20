@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit3, Save, ArrowLeft, Eye, ToggleLeft, ToggleRight, Share2, Copy, Calendar, Users } from 'lucide-react';
-import { Question, Survey } from '../types/survey';
+import { ArrowLeft, Send, CheckCircle } from 'lucide-react';
+import { Survey, Question, Response, Answer } from '../types/survey';
 import { databaseUtils } from '../utils/database';
-import { isSupabaseConfigured } from '../lib/supabase';
 import { User } from '../types/auth';
 
 // Generate a proper UUID v4
@@ -14,444 +13,257 @@ const generateUUID = () => {
   });
 };
 
-// Generate a URL-safe public ID
-const generatePublicId = () => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-};
-
-interface SurveyBuilderProps {
-  survey?: Survey;
-  onSave: (survey: Survey) => void;
-  onCancel: () => void;
+interface SurveyTakerProps {
+  survey: Survey;
+  onBack: () => void;
   user: User | null;
 }
 
-const questionTypes = [
-  { value: 'text', label: 'Short Text' },
-  { value: 'textarea', label: 'Long Text' },
-  { value: 'multiple-choice', label: 'Multiple Choice' },
-  { value: 'multiple-select', label: 'Multiple Select' },
-  { value: 'rating', label: 'Rating' },
-  { value: 'email', label: 'Email' },
-  { value: 'number', label: 'Number' },
-];
+export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack, user }) => {
+  const [answers, setAnswers] = useState<{ [questionId: string]: string | number | string[] }>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errors, setErrors] = useState<{ [questionId: string]: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({ survey, onSave, onCancel, user }) => {
-  const [title, setTitle] = useState(survey?.title || '');
-  const [description, setDescription] = useState(survey?.description || '');
-  const [questions, setQuestions] = useState<Question[]>(survey?.questions || []);
-  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
-  const [allowPublicAccess, setAllowPublicAccess] = useState(survey?.allowPublicAccess ?? true);
-  const [responseLimit, setResponseLimit] = useState(survey?.responseLimit || '');
-  const [expiresAt, setExpiresAt] = useState(survey?.expiresAt ? survey.expiresAt.split('T')[0] : '');
-  const [showShareOptions, setShowShareOptions] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const addQuestion = () => {
-    const newQuestion: Question = {
-      id: generateUUID(),
-      type: 'text',
-      title: 'New Question',
-      required: false,
-    };
-    setQuestions([...questions, newQuestion]);
-    setEditingQuestionId(newQuestion.id);
+  const handleAnswerChange = (questionId: string, value: string | number) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+    if (errors[questionId]) {
+      setErrors(prev => ({ ...prev, [questionId]: '' }));
+    }
   };
 
-  const updateQuestion = (questionId: string, updates: Partial<Question>) => {
-    setQuestions(questions.map(q => 
-      q.id === questionId ? { ...q, ...updates } : q
-    ));
+  const validateForm = () => {
+    const newErrors: { [questionId: string]: string } = {};
+    
+    survey.questions.forEach(question => {
+      if (question.required && !answers[question.id]) {
+        newErrors[question.id] = 'This field is required';
+      }
+      
+      if (question.type === 'email' && answers[question.id]) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(answers[question.id] as string)) {
+          newErrors[question.id] = 'Please enter a valid email address';
+        }
+      }
+      
+      if (question.type === 'number' && answers[question.id]) {
+        const num = Number(answers[question.id]);
+        if (isNaN(num)) {
+          newErrors[question.id] = 'Please enter a valid number';
+        }
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const deleteQuestion = (questionId: string) => {
-    setQuestions(questions.filter(q => q.id !== questionId));
-  };
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
 
-  const handleSave = async () => {
-    if (!title.trim()) {
-      alert('Please enter a survey title');
-      return;
-    }
-
-    if (questions.length === 0) {
-      alert('Please add at least one question');
-      return;
-    }
-
-    // Enhanced authentication check
-    if (isSupabaseConfigured && !user) {
-      alert('You must be signed in to save surveys. Please sign in and try again.');
-      return;
-    }
-
-    // Validate questions have required fields
-    const invalidQuestions = questions.filter(q => !q.title.trim());
-    if (invalidQuestions.length > 0) {
-      alert('All questions must have a title');
-      return;
-    }
-
-    setIsSaving(true);
+    setIsSubmitting(true);
     try {
-      const surveyData: Survey = {
-        id: survey?.id || generateUUID(),
-        title: title.trim(),
-        description: description.trim(),
-        questions: questions.map(q => ({
-          ...q,
-          title: q.title.trim()
+      const response: Response = {
+        id: generateUUID(),
+        surveyId: survey.id,
+        answers: Object.entries(answers).map(([questionId, value]) => ({
+          questionId,
+          value
         })),
-        createdAt: survey?.createdAt || new Date().toISOString(),
-        isActive: survey?.isActive ?? true,
-        publicId: survey?.publicId || generatePublicId(),
-        allowPublicAccess,
-        responseLimit: responseLimit ? parseInt(responseLimit) : undefined,
-        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+        submittedAt: new Date().toISOString(),
       };
 
-      console.log('Saving survey with user:', user?.email);
-      const savedSurvey = await databaseUtils.saveSurvey(surveyData, user!);
-      onSave(savedSurvey);
+      console.log('Submitting response:', {
+        surveyId: response.surveyId,
+        answersCount: response.answers.length,
+        hasUser: !!user
+      });
+
+      await databaseUtils.saveResponse(response);
+      setIsSubmitted(true);
     } catch (error) {
-      console.error('Failed to save survey:', error);
+      console.error('Failed to submit response:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      alert(`Failed to save survey: ${errorMessage}`);
+      alert(`Failed to submit response: ${errorMessage}`);
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
-  const getPublicUrl = () => {
-    const publicId = survey?.publicId || 'preview';
-    return `${window.location.origin}/s/${publicId}`;
-  };
-
-  const copyPublicUrl = () => {
-    navigator.clipboard.writeText(getPublicUrl());
-    alert('Public link copied to clipboard!');
-  };
-
-  const renderQuestionEditor = (question: Question) => {
-    const isEditing = editingQuestionId === question.id;
+  const renderQuestion = (question: Question) => {
+    const answer = answers[question.id];
+    const error = errors[question.id];
 
     return (
-      <div key={question.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            {isEditing ? (
-              <input
-                type="text"
-                value={question.title}
-                onChange={(e) => updateQuestion(question.id, { title: e.target.value })}
-                className="w-full text-lg font-medium bg-transparent border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
-                placeholder="Question title"
-                autoFocus
-              />
-            ) : (
-              <h3 className="text-lg font-medium text-gray-900">{question.title}</h3>
-            )}
-          </div>
-          <div className="flex items-center gap-2 ml-4">
-            <button
-              onClick={() => setEditingQuestionId(isEditing ? null : question.id)}
-              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            >
-              {isEditing ? <Save size={16} /> : <Edit3 size={16} />}
-            </button>
-            <button
-              onClick={() => deleteQuestion(question.id)}
-              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
+      <div key={question.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="mb-4">
+          <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2 leading-relaxed">
+            {question.title}
+            {question.required && <span className="text-red-500 ml-1">*</span>}
+          </h3>
         </div>
 
-        {isEditing && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Question Type
+        {question.type === 'text' && (
+          <input
+            type="text"
+            value={answer || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            className={`w-full p-3 text-base border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+              error ? 'border-red-500' : 'border-gray-300'
+            } hover:border-gray-400`}
+            placeholder="Your answer"
+            autoComplete="off"
+            spellCheck="true"
+          />
+        )}
+
+        {question.type === 'textarea' && (
+          <textarea
+            value={answer || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            rows={3}
+            className={`w-full p-3 text-base border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-y min-h-[80px] ${
+              error ? 'border-red-500' : 'border-gray-300'
+            } hover:border-gray-400`}
+            placeholder="Your answer"
+            autoComplete="off"
+            spellCheck="true"
+          />
+        )}
+
+        {question.type === 'email' && (
+          <input
+            type="email"
+            value={answer || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            className={`w-full p-3 text-base border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+              error ? 'border-red-500' : 'border-gray-300'
+            } hover:border-gray-400`}
+            placeholder="your.email@example.com"
+            autoComplete="email"
+            inputMode="email"
+          />
+        )}
+
+        {question.type === 'number' && (
+          <input
+            type="number"
+            value={answer || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            className={`w-full p-3 text-base border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+              error ? 'border-red-500' : 'border-gray-300'
+            } hover:border-gray-400`}
+            placeholder="Enter a number"
+            inputMode="numeric"
+            pattern="[0-9]*"
+          />
+        )}
+
+        {question.type === 'multiple-choice' && (
+          <div className="space-y-2 sm:space-y-3">
+            {question.options?.map((option, index) => (
+              <label key={index} className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                <input
+                  type="radio"
+                  name={question.id}
+                  value={option}
+                  checked={answer === option}
+                  onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                  className="w-4 h-4 mt-0.5 text-blue-600 focus:ring-blue-500 focus:ring-2 focus:ring-offset-2"
+                />
+                <span className="text-gray-700 text-sm sm:text-base leading-relaxed flex-1">{option}</span>
               </label>
-              <select
-                value={question.type}
-                onChange={(e) => updateQuestion(question.id, { type: e.target.value as Question['type'] })}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {questionTypes.map(type => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {(question.type === 'multiple-choice' || question.type === 'multiple-select') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Options
-                </label>
-                <div className="space-y-2">
-                  {(question.options || []).map((option, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...(question.options || [])];
-                          newOptions[index] = e.target.value;
-                          updateQuestion(question.id, { options: newOptions });
-                        }}
-                        className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder={`Option ${index + 1}`}
-                      />
-                      <button
-                        onClick={() => {
-                          const newOptions = (question.options || []).filter((_, i) => i !== index);
-                          updateQuestion(question.id, { options: newOptions });
-                        }}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => {
-                      const newOptions = [...(question.options || []), ''];
-                      updateQuestion(question.id, { options: newOptions });
-                    }}
-                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                  >
-                    + Add Option
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {question.type === 'rating' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Maximum Rating
-                </label>
-                <select
-                  value={question.maxRating || 5}
-                  onChange={(e) => updateQuestion(question.id, { maxRating: parseInt(e.target.value) })}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value={5}>5 Stars</option>
-                  <option value={10}>10 Points</option>
-                </select>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => updateQuestion(question.id, { required: !question.required })}
-                className={`p-2 rounded-lg transition-colors ${
-                  question.required 
-                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' 
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {question.required ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-              </button>
-              <span className="text-sm text-gray-700">Required</span>
-            </div>
+            ))}
           </div>
         )}
 
-        {!isEditing && (
-          <div className="mt-4">
-            <p className="text-sm text-gray-600 mb-2">
-              Type: {questionTypes.find(t => t.value === question.type)?.label}
-              {question.required && <span className="text-red-500 ml-1">*</span>}
-            </p>
-            {(question.type === 'multiple-choice' || question.type === 'multiple-select') && question.options && (
-              <div className="space-y-1">
-                {question.options.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
-                    <div className={`w-3 h-3 border border-gray-300 ${
-                      question.type === 'multiple-select' ? 'rounded' : 'rounded-full'
-                    }`}></div>
-                    {option}
-                  </div>
-                ))}
-              </div>
-            )}
+        {question.type === 'rating' && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+            {Array.from({ length: question.maxRating || 5 }).map((_, index) => (
+              <button
+                key={index}
+                onClick={() => handleAnswerChange(question.id, index + 1)}
+                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center font-medium transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm sm:text-base ${
+                  (answer as number) >= index + 1
+                    ? 'bg-yellow-400 border-yellow-400 text-white'
+                    : 'border-gray-300 text-gray-400 hover:border-yellow-400'
+                }`}
+                type="button"
+                aria-label={`Rate ${index + 1} out of ${question.maxRating || 5}`}
+              >
+                {index + 1}
+              </button>
+            ))}
+            </div>
+            <span className="text-sm text-gray-600 sm:ml-2">
+              {answer ? `${answer}/${question.maxRating || 5}` : 'Not rated'}
+            </span>
           </div>
+        )}
+
+        {error && (
+          <p className="mt-2 text-sm text-red-600">{error}</p>
         )}
       </div>
     );
   };
 
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
+  if (isSubmitted) {
+    return (
+      <div className="max-w-2xl mx-auto p-4 sm:p-6 text-center">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12">
+          <div className="flex justify-center mb-6">
+            <CheckCircle className="w-16 h-16 text-green-500" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
+            Thank you for your response!
+          </h2>
+          <p className="text-gray-600 mb-8 text-sm sm:text-base">
+            Your answers have been submitted successfully.
+          </p>
           <button
-            onClick={onCancel}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={onBack}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 font-medium text-sm sm:text-base"
           >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {survey ? 'Edit Survey' : 'Create New Survey'}
-          </h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            <Save size={16} />
-            {isSaving ? 'Saving...' : 'Save Survey'}
+            Back to Surveys
           </button>
         </div>
       </div>
+    );
+  }
 
-      <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Survey Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter survey title"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter survey description"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Public Access Settings */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Public Access Settings</h3>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Allow Public Access</label>
-                <p className="text-sm text-gray-500">Enable anyone with the link to respond</p>
-              </div>
-              <button
-                onClick={() => setAllowPublicAccess(!allowPublicAccess)}
-                className={`p-2 rounded-lg transition-colors ${
-                  allowPublicAccess 
-                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' 
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {allowPublicAccess ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-              </button>
-            </div>
-
-            {allowPublicAccess && (
-              <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Response Limit (Optional)
-                    </label>
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                      <input
-                        type="number"
-                        value={responseLimit}
-                        onChange={(e) => setResponseLimit(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="No limit"
-                        min="1"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Expiration Date (Optional)
-                    </label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                      <input
-                        type="date"
-                        value={expiresAt}
-                        onChange={(e) => setExpiresAt(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        min={new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {survey && (
-                  <div className="border-t pt-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Public Survey Link</label>
-                        <p className="text-sm text-gray-500">Share this link to collect responses</p>
-                      </div>
-                      <button
-                        onClick={() => setShowShareOptions(!showShareOptions)}
-                        className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium"
-                      >
-                        <Share2 size={16} />
-                        Share
-                      </button>
-                    </div>
-                    
-                    {showShareOptions && (
-                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={getPublicUrl()}
-                            readOnly
-                            className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm"
-                          />
-                          <button
-                            onClick={copyPublicUrl}
-                            className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
-                          >
-                            <Copy size={14} />
-                            Copy
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {questions.map(renderQuestionEditor)}
-        </div>
-
+  return (
+    <div className="max-w-2xl mx-auto p-4 sm:p-6 safe-area-inset">
+      <div className="flex items-center gap-4 mb-6 sm:mb-8">
         <button
-          onClick={addQuestion}
-          className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors"
+          onClick={onBack}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
         >
-          <Plus size={20} />
-          Add Question
+          <ArrowLeft size={20} />
         </button>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{survey.title}</h1>
+          {survey.description && (
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">{survey.description}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-4 sm:space-y-6">
+        {survey.questions.map(renderQuestion)}
+        
+        <div className="flex justify-center sm:justify-end pt-6">
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 font-medium text-sm sm:text-base w-full sm:w-auto justify-center touch-manipulation"
+          >
+            <Send size={16} />
+            {isSubmitting ? 'Submitting...' : 'Submit Survey'}
+          </button>
+        </div>
       </div>
     </div>
   );

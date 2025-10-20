@@ -13,7 +13,15 @@ export const exportUtils = {
       
       survey.questions.forEach(question => {
         const answer = response.answers.find(a => a.questionId === question.id);
-        row.push(answer ? String(answer.value) : '');
+        if (answer) {
+          if (Array.isArray(answer.value)) {
+            row.push(answer.value.join(', '));
+          } else {
+            row.push(String(answer.value));
+          }
+        } else {
+          row.push('');
+        }
       });
       
       return row;
@@ -43,7 +51,15 @@ export const exportUtils = {
       
       survey.questions.forEach(question => {
         const answer = response.answers.find(a => a.questionId === question.id);
-        row[question.title] = answer ? String(answer.value) : '';
+        if (answer) {
+          if (Array.isArray(answer.value)) {
+            row[question.title] = answer.value.join(', ');
+          } else {
+            row[question.title] = String(answer.value);
+          }
+        } else {
+          row[question.title] = '';
+        }
       });
       
       return row;

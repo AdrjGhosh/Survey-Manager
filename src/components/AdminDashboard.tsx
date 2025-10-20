@@ -97,10 +97,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, user }) 
 
     const answers = responses.map(r => r.answers.find(a => a.questionId === questionId)?.value).filter(Boolean);
     
-    if (question.type === 'multiple-choice') {
+    if (question.type === 'multiple-choice' || question.type === 'multiple-select') {
       const distribution: { [key: string]: number } = {};
       answers.forEach(answer => {
-        distribution[answer as string] = (distribution[answer as string] || 0) + 1;
+        if (Array.isArray(answer)) {
+          // Handle multiple-select answers
+          answer.forEach(choice => {
+            distribution[choice] = (distribution[choice] || 0) + 1;
+          });
+        } else {
+          // Handle single choice answers
+          distribution[answer as string] = (distribution[answer as string] || 0) + 1;
+        }
       });
       
       return {

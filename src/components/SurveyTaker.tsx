@@ -20,35 +20,48 @@ interface SurveyTakerProps {
 }
 
 export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack, user }) => {
-  const [answers, setAnswers] = useState<{ [questionId: string]: string | number }>({});
+  const [answers, setAnswers] = useState<{ [questionId: string]: string | number | string[] }>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [questionId: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAnswerChange = (questionId: string, value: string | number) => {
+  const handleAnswerChange = (questionId: string, value: string | number | string[]) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
     if (errors[questionId]) {
       setErrors(prev => ({ ...prev, [questionId]: '' }));
     }
   };
 
+  const handleMultipleSelectChange = (questionId: string, option: string, checked: boolean) => {
+    const currentAnswers = (answers[questionId] as string[]) || [];
+    let newAnswers: string[];
+    
+    if (checked) {
+      newAnswers = [...currentAnswers, option];
+    } else {
+      newAnswers = currentAnswers.filter(answer => answer !== option);
+    }
+    
+    handleAnswerChange(questionId, newAnswers);
+  };
   const validateForm = () => {
     const newErrors: { [questionId: string]: string } = {};
     
     survey.questions.forEach(question => {
-      if (question.required && !answers[question.id]) {
+      const answer = answers[question.id];
+      if (question.required && (!answer || (Array.isArray(answer) && answer.length === 0))) {
         newErrors[question.id] = 'This field is required';
       }
       
-      if (question.type === 'email' && answers[question.id]) {
+      if (question.type === 'email' && answer && !Array.isArray(answer)) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(answers[question.id] as string)) {
+        if (!emailRegex.test(answer as string)) {
           newErrors[question.id] = 'Please enter a valid email address';
         }
       }
       
-      if (question.type === 'number' && answers[question.id]) {
-        const num = Number(answers[question.id]);
+      if (question.type === 'number' && answer && !Array.isArray(answer)) {
+        const num = Number(answer);
         if (isNaN(num)) {
           newErrors[question.id] = 'Please enter a valid number';
         }
@@ -178,6 +191,27 @@ export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack, user }
           </div>
         )}
 
+        {question.type === 'multiple-select' && (
+          <div className="space-y-2 sm:space-y-3">
+            {question.options?.map((option, index) => (
+              <label key={index} className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                <input
+                  type="checkbox"
+                  value={option}
+                  checked={Array.isArray(answer) ? answer.includes(option) : false}
+                  onChange={(e) => handleMultipleSelectChange(question.id, option, e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-blue-600 focus:ring-blue-500 focus:ring-2 focus:ring-offset-2 rounded"
+                />
+                <span className="text-gray-700 text-sm sm:text-base leading-relaxed flex-1">{option}</span>
+              </label>
+            ))}
+            {Array.isArray(answer) && answer.length > 0 && (
+              <p className="text-sm text-gray-500 mt-2">
+                {answer.length} option{answer.length !== 1 ? 's' : ''} selected
+              </p>
+            )}
+          </div>
+        )}
         {question.type === 'rating' && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
             <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
