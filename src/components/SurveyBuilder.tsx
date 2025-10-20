@@ -19,7 +19,7 @@ interface SurveyTakerProps {
   user: User | null;
 }
 
-export const SurveyTaker: React.FC<SurveyTakerProps> = ({ survey, onBack, user }) => {
+export const SurveyBuilder: React.FC<SurveyTakerProps> = ({ survey, onBack, user }) => {
   const [answers, setAnswers] = useState<{ [questionId: string]: string | number | string[] }>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [questionId: string]: string }>({});
